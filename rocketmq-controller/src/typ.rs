@@ -1,19 +1,16 @@
-//  Licensed to the Apache Software Foundation (ASF) under one
-//  or more contributor license agreements.  See the NOTICE file
-//  distributed with this work for additional information
-//  regarding copyright ownership.  The ASF licenses this file
-//  to you under the Apache License, Version 2.0 (the
-//  "License"); you may not use this file except in compliance
-//  with the License.  You may obtain a copy of the License at
+// Copyright 2023 The RocketMQ Rust Authors
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-//  Unless required by applicable law or agreed to in writing,
-//  software distributed under the License is distributed on an
-//  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-//  KIND, either express or implied.  See the License for the
-//  specific language governing permissions and limitations
-//  under the License.
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 //! OpenRaft type definitions for RocketMQ Controller
 //!
@@ -84,6 +81,14 @@ pub enum ControllerRequest {
         write_queue_nums: i32,
         perm: i32,
     },
+    /// Apply for a specific broker ID
+    ApplyBrokerId {
+        cluster_name: String,
+        broker_name: String,
+        broker_addr: String,
+        applied_broker_id: u64,
+        register_check_code: String,
+    },
 }
 
 impl std::fmt::Display for ControllerRequest {
@@ -97,6 +102,11 @@ impl std::fmt::Display for ControllerRequest {
             }
             Self::UpdateConfig { key, .. } => write!(f, "UpdateConfig({})", key),
             Self::UpdateTopic { topic_name, .. } => write!(f, "UpdateTopic({})", topic_name),
+            Self::ApplyBrokerId {
+                broker_name,
+                applied_broker_id,
+                ..
+            } => write!(f, "ApplyBrokerId({}, id={})", broker_name, applied_broker_id),
         }
     }
 }
@@ -120,6 +130,13 @@ pub enum ControllerResponse {
         master_addr: Option<String>,
         master_epoch: Option<i32>,
         sync_state_set_epoch: Option<i32>,
+    },
+    /// Response for broker ID application
+    ApplyBrokerId {
+        success: bool,
+        error: Option<String>,
+        cluster_name: String,
+        broker_name: String,
     },
     /// Generic success response
     Success,

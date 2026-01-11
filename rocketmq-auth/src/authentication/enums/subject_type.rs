@@ -1,19 +1,16 @@
-//  Licensed to the Apache Software Foundation (ASF) under one
-//  or more contributor license agreements.  See the NOTICE file
-//  distributed with this work for additional information
-//  regarding copyright ownership.  The ASF licenses this file
-//  to you under the Apache License, Version 2.0 (the
-//  "License"); you may not use this file except in compliance
-//  with the License.  You may obtain a copy of the License at
+// Copyright 2023 The RocketMQ Rust Authors
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-//  Unless required by applicable law or agreed to in writing,
-//  software distributed under the License is distributed on an
-//  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-//  KIND, either express or implied.  See the License for the
-//  specific language governing permissions and limitations
-//  under the License.
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use serde::Deserialize;
 use serde::Deserializer;
@@ -67,5 +64,62 @@ impl<'de> Deserialize<'de> for SubjectType {
             1 => Ok(SubjectType::User),
             _ => Err(serde::de::Error::custom("invalid SubjectType")),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json;
+
+    use super::*;
+
+    #[test]
+    fn test_get_by_name() {
+        assert_eq!(SubjectType::get_by_name("User"), Some(SubjectType::User));
+        assert_eq!(SubjectType::get_by_name("user"), Some(SubjectType::User));
+        assert_eq!(SubjectType::get_by_name("USER"), Some(SubjectType::User));
+        assert_eq!(SubjectType::get_by_name("invalid"), None);
+    }
+
+    #[test]
+    fn test_code() {
+        assert_eq!(SubjectType::User.code(), 1);
+    }
+
+    #[test]
+    fn test_name() {
+        assert_eq!(SubjectType::User.name(), "User");
+    }
+
+    #[test]
+    fn test_serialize() {
+        let user_json = serde_json::to_string(&SubjectType::User).unwrap();
+        assert_eq!(user_json, "1");
+    }
+
+    #[test]
+    fn test_deserialize() {
+        let user: SubjectType = serde_json::from_str("1").unwrap();
+        assert_eq!(user, SubjectType::User);
+    }
+
+    #[test]
+    fn test_deserialize_invalid() {
+        let result: Result<SubjectType, _> = serde_json::from_str("0");
+        assert!(result.is_err());
+
+        let result: Result<SubjectType, _> = serde_json::from_str("2");
+        assert!(result.is_err());
+
+        let result: Result<SubjectType, _> = serde_json::from_str("\"User\"");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_round_trip_serialization() {
+        let original = SubjectType::User;
+        let serialized = serde_json::to_string(&original).unwrap();
+        let deserialized: SubjectType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(original, deserialized);
     }
 }

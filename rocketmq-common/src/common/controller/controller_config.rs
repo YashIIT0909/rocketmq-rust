@@ -1,21 +1,19 @@
-//  Licensed to the Apache Software Foundation (ASF) under one
-//  or more contributor license agreements.  See the NOTICE file
-//  distributed with this work for additional information
-//  regarding copyright ownership.  The ASF licenses this file
-//  to you under the Apache License, Version 2.0 (the
-//  "License"); you may not use this file except in compliance
-//  with the License.  You may obtain a copy of the License at
+// Copyright 2023 The RocketMQ Rust Authors
 //
-//    http://www.apache.org/licenses/LICENSE-2.0
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-//  Unless required by applicable law or agreed to in writing,
-//  software distributed under the License is distributed on an
-//  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-//  KIND, either express or implied.  See the License for the
-//  specific language governing permissions and limitations
-//  under the License.
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use std::env;
+use std::fmt;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
@@ -54,6 +52,16 @@ pub enum StorageBackendType {
 
     /// In-memory storage (for testing)
     Memory,
+}
+
+impl fmt::Display for StorageBackendType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RocksDB => write!(f, "rocks_db"),
+            Self::File => write!(f, "file"),
+            Self::Memory => write!(f, "memory"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -244,7 +252,7 @@ impl Default for ControllerConfig {
             metrics_in_delta: false,
             config_black_list: "configBlackList;configStorePath".to_string(),
             node_id: 1,
-            listen_addr: "127.0.0.1:9876".parse().unwrap(),
+            listen_addr: "127.0.0.1:60109".parse().unwrap(),
             raft_peers: Vec::new(),
             election_timeout_ms: 1000,
             heartbeat_interval_ms: 300,
@@ -346,11 +354,7 @@ impl ControllerConfig {
     }
 
     /// Set metrics gRPC exporter configuration
-    pub fn with_metrics_grpc_exporter(
-        mut self,
-        target: impl Into<String>,
-        header: impl Into<String>,
-    ) -> Self {
+    pub fn with_metrics_grpc_exporter(mut self, target: impl Into<String>, header: impl Into<String>) -> Self {
         self.metrics_grpc_exporter_target = target.into();
         self.metrics_grpc_exporter_header = header.into();
         self
@@ -425,14 +429,12 @@ impl ControllerConfig {
 
     /// Test config helper
     pub fn test_config() -> Self {
-        Self::default().with_node_info(1, "127.0.0.1:9876".parse().unwrap())
+        Self::default().with_node_info(1, "127.0.0.1:60109".parse().unwrap())
     }
 
     /// Check if a configuration key is in the blacklist
     pub fn is_config_in_blacklist(&self, key: &str) -> bool {
-        self.config_black_list
-            .split(';')
-            .any(|item| item.trim() == key)
+        self.config_black_list.split(';').any(|item| item.trim() == key)
     }
 
     /// Validate the configuration
@@ -449,9 +451,7 @@ impl ControllerConfig {
         }
 
         if self.controller_request_thread_pool_queue_capacity == 0 {
-            return Err(
-                "controller_request_thread_pool_queue_capacity must be greater than 0".to_string(),
-            );
+            return Err("controller_request_thread_pool_queue_capacity must be greater than 0".to_string());
         }
 
         if self.mapped_file_size == 0 {
@@ -463,6 +463,102 @@ impl ControllerConfig {
         }
 
         Ok(())
+    }
+
+    /// Convert configuration to properties string format
+    ///
+    /// Returns a string in properties format (key=value\n) using camelCase naming
+    pub fn to_properties_string(&self) -> String {
+        use std::fmt::Write;
+
+        let mut result = String::with_capacity(2048);
+
+        writeln!(result, "rocketmqHome={}", self.rocketmq_home).unwrap();
+        writeln!(result, "configStorePath={}", self.config_store_path.display()).unwrap();
+        writeln!(result, "controllerType={}", self.controller_type).unwrap();
+        writeln!(
+            result,
+            "scanNotActiveBrokerInterval={}",
+            self.scan_not_active_broker_interval
+        )
+        .unwrap();
+        writeln!(result, "controllerThreadPoolNums={}", self.controller_thread_pool_nums).unwrap();
+        writeln!(
+            result,
+            "controllerRequestThreadPoolQueueCapacity={}",
+            self.controller_request_thread_pool_queue_capacity
+        )
+        .unwrap();
+        writeln!(result, "mappedFileSize={}", self.mapped_file_size).unwrap();
+        writeln!(result, "controllerStorePath={}", self.controller_store_path).unwrap();
+        writeln!(result, "electMasterMaxRetryCount={}", self.elect_master_max_retry_count).unwrap();
+        writeln!(result, "enableElectUncleanMaster={}", self.enable_elect_unclean_master).unwrap();
+        writeln!(result, "isProcessReadEvent={}", self.is_process_read_event).unwrap();
+        writeln!(result, "notifyBrokerRoleChanged={}", self.notify_broker_role_changed).unwrap();
+        writeln!(
+            result,
+            "scanInactiveMasterInterval={}",
+            self.scan_inactive_master_interval
+        )
+        .unwrap();
+        writeln!(result, "metricsExporterType={}", self.metrics_exporter_type).unwrap();
+        writeln!(
+            result,
+            "metricsGrpcExporterTarget={}",
+            self.metrics_grpc_exporter_target
+        )
+        .unwrap();
+        writeln!(
+            result,
+            "metricsGrpcExporterHeader={}",
+            self.metrics_grpc_exporter_header
+        )
+        .unwrap();
+        writeln!(
+            result,
+            "metricGrpcExporterTimeOutInMills={}",
+            self.metric_grpc_exporter_time_out_in_mills
+        )
+        .unwrap();
+        writeln!(
+            result,
+            "metricGrpcExporterIntervalInMills={}",
+            self.metric_grpc_exporter_interval_in_mills
+        )
+        .unwrap();
+        writeln!(
+            result,
+            "metricLoggingExporterIntervalInMills={}",
+            self.metric_logging_exporter_interval_in_mills
+        )
+        .unwrap();
+        writeln!(result, "metricsPromExporterPort={}", self.metrics_prom_exporter_port).unwrap();
+        writeln!(result, "metricsPromExporterHost={}", self.metrics_prom_exporter_host).unwrap();
+        writeln!(result, "metricsLabel={}", self.metrics_label).unwrap();
+        writeln!(result, "metricsInDelta={}", self.metrics_in_delta).unwrap();
+        writeln!(result, "configBlackList={}", self.config_black_list).unwrap();
+        writeln!(result, "nodeId={}", self.node_id).unwrap();
+        writeln!(result, "listenAddr={}", self.listen_addr).unwrap();
+
+        let peers: Vec<String> = self
+            .raft_peers
+            .iter()
+            .map(|peer| format!("{}-{}", peer.id, peer.addr))
+            .collect();
+        writeln!(result, "raftPeers={}", peers.join(";")).unwrap();
+
+        writeln!(result, "electionTimeoutMs={}", self.election_timeout_ms).unwrap();
+        writeln!(result, "heartbeatIntervalMs={}", self.heartbeat_interval_ms).unwrap();
+        writeln!(result, "storagePath={}", self.storage_path).unwrap();
+        writeln!(result, "storageBackend={}", self.storage_backend).unwrap();
+        writeln!(
+            result,
+            "enableElectUncleanMasterLocal={}",
+            self.enable_elect_unclean_master_local
+        )
+        .unwrap();
+
+        result
     }
 }
 
@@ -537,5 +633,69 @@ mod tests {
         assert_eq!(config.metrics_prom_exporter_host, "localhost");
         assert_eq!(config.metrics_prom_exporter_port, 9090);
         assert_eq!(config.metrics_label, "instance_id:test,uid:123");
+    }
+
+    #[test]
+    fn test_to_properties_string_basic() {
+        let config = ControllerConfig::default();
+        let result = config.to_properties_string();
+
+        assert!(result.contains("rocketmqHome="));
+        assert!(result.contains("controllerType=Raft"));
+        assert!(result.contains("scanNotActiveBrokerInterval=5000"));
+        assert!(result.contains("controllerThreadPoolNums=16"));
+        assert!(result.contains("notifyBrokerRoleChanged=true"));
+        assert!(result.contains("enableElectUncleanMaster=false"));
+    }
+
+    #[test]
+    fn test_to_properties_string_format() {
+        let config = ControllerConfig::default();
+        let result = config.to_properties_string();
+
+        let lines: Vec<&str> = result.lines().collect();
+        assert!(!lines.is_empty());
+
+        for line in lines {
+            assert!(line.contains('='), "Each line should contain '=': {}", line);
+            let parts: Vec<&str> = line.split('=').collect();
+            assert_eq!(parts.len(), 2, "Each line should have exactly one '=': {}", line);
+        }
+    }
+
+    #[test]
+    fn test_to_properties_string_with_custom_config() {
+        let config = ControllerConfig::new()
+            .with_controller_type(RAFT_CONTROLLER)
+            .with_scan_not_active_broker_interval(10000)
+            .with_controller_thread_pool_nums(32)
+            .with_enable_elect_unclean_master(true)
+            .with_storage_backend(StorageBackendType::RocksDB);
+
+        let result = config.to_properties_string();
+
+        assert!(result.contains("controllerType=Raft"));
+        assert!(result.contains("scanNotActiveBrokerInterval=10000"));
+        assert!(result.contains("controllerThreadPoolNums=32"));
+        assert!(result.contains("enableElectUncleanMaster=true"));
+        assert!(result.contains("storageBackend=rocks_db"));
+    }
+
+    #[test]
+    fn test_to_properties_string_with_raft_peers() {
+        let config = ControllerConfig::new().with_raft_peers(vec![
+            RaftPeer {
+                id: 1,
+                addr: "127.0.0.1:9877".parse().unwrap(),
+            },
+            RaftPeer {
+                id: 2,
+                addr: "127.0.0.1:9878".parse().unwrap(),
+            },
+        ]);
+
+        let result = config.to_properties_string();
+
+        assert!(result.contains("raftPeers=1-127.0.0.1:9877;2-127.0.0.1:9878"));
     }
 }
